@@ -26,45 +26,41 @@ exportBtn.onclick = () => {
 };
 
 /* ---------------- Table rendering ---------------- */
-function renderTable(data) {
-
-    const columns = [
-        'paintRecord','ts','process','date','operator',
-        'timeInBooth','timeStart','timeEnd','paintTime','lagTime',
-        'recommendedLag','avoidableLag','lagToPaintRatio'
-    ];
-
-    let html = '<table border="1" style="border-collapse:collapse;width:100%">';
-    html += '<thead><tr>';
-
-    columns.forEach(c => {
-        html += `<th>${c}</th>`;
-    });
-
-    html += '</tr></thead><tbody>';
-
-    if (data && data.length > 0) {
-        data.forEach(row => {
-            html += '<tr>';
-            columns.forEach(c => {
-                html += `<td>${row[c] ?? ''}</td>`;
-            });
-            html += '</tr>';
-        });
-    } else {
-        html += `
-            <tr>
-                <td colspan="${columns.length}" 
-                    style="text-align:center;font-style:italic;">
-                    No records
-                </td>
-            </tr>
-        `;
+function renderTable(data){
+    if (!data || data.length === 0) {
+        recordsTable.innerHTML = '<i>No records</i>';
+        return;
     }
 
-    html += '</tbody></table>';
-    recordsTable.innerHTML = html;
+    const cols = [
+        'paintRecord',
+        'ts',
+        'process',
+        'date',
+        'operator',
+        'timeInBooth',
+        'timeStart',
+        'timeEnd',
+        'paintTime',
+        'lagTime',
+        'recommendedLag',
+        'avoidableLag',
+        'lagToPaintRatio'
+    ];
+
+    let html = '<table><tr>';
+    cols.forEach(c => html += `<th>${c}</th>`);
+    html += '</tr>';
+
+    data.forEach(row => {
+        html += '<tr>';
+        cols.forEach(c => html += `<td>${row[c] ?? ''}</td>`);
+        html += '</tr>';
+    });
+
+    recordsTable.innerHTML = html + '</table>';
 }
+
 
 /* ---------------- Figures ---------------- */
 function renderFigures(data) {
