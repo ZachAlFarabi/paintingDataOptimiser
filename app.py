@@ -71,31 +71,48 @@ def computeBufferedHull(df):
     avoidableLagList = []
 
     df['date_dt'] = pd.to_datetime(df['date'], format='%d/%m/%y', errors='coerce')
-    cutoff = (df['date_dt'].max() if not df['date_dt'].isna().all() else pd.Timestamp.now()) - pd.Timedelta(days=WINDOW_DAYS)
+    cutoff = (
+        df['date_dt'].max()
+        if not df['date_dt'].isna().all()
+        else pd.Timestamp.now()
+    ) - pd.Timedelta(days=WINDOW_DAYS)
+
     recentDf = df[df['date_dt'] >= cutoff]
 
     for ts in recentDf['ts'].unique():
         hullPointsByTS[ts] = {}
-        for process in ['primer','topcoat','extra']:
-            procDf = recentDf[(recentDf['ts'] == ts) & (recentDf['process'] == process)]
-            points = procDf[['paintTime','lagTime']].dropna().values
-            points = np.unique(points, axis=0)
+
+        for process in ['primer', 'topcoat', 'extra']:
+            procDf = recentDf[
+                (recentDf['ts'] == ts) &
+                (recentDf['process'] == process)
+            ]
+
+            # ---- FIX #2: force numeric + drop invalid rows ----
+            points = procDf[['paintTime', 'lagTime']].to_numpy(dtype=float)
+            points = points[~np.isnan(points).any(axis=1)]
 
             if len(points) < MIN_HULL_SUPPORT:
                 hullPointsByTS[ts][process] = []
                 continue
 
+            points = np.unique(points, axis=0)
+
             try:
                 hull = ConvexHull(points, qhull_options='QJ')
                 vertices = points[hull.vertices]
-                vertices = vertices[np.argsort(vertices[:,0])]
+                vertices = vertices[np.argsort(vertices[:, 0])]
 
                 lower = [vertices[0]]
                 for x, y in vertices[1:]:
                     if y <= lower[-1][1]:
-                        lower.append([x,y])
+                        lower.append([x, y])
 
-                hullPointsByTS[ts][process] = [[float(x), float(y + BUFFER_HOURS)] for x,y in lower]
+                hullPointsByTS[ts][process] = [
+                    [float(x), float(y + BUFFER_HOURS)]
+                    for x, y in lower
+                ]
+
             except QhullError:
                 hullPointsByTS[ts][process] = []
 
@@ -104,24 +121,28 @@ def computeBufferedHull(df):
         recLag = None
 
         if hull and pd.notna(r['paintTime']):
-            h = np.array(hull)
-            recLag = float(np.interp(r['paintTime'], h[:,0], h[:,1]))
+            h = np.array(hull, dtype=float)
+            recLag = float(np.interp(r['paintTime'], h[:, 0], h[:, 1]))
 
         recommendedLagDict[idx] = recLag
         avoidableLagList.append(
-            max(0, r['lagTime'] - recLag) if recLag is not None and pd.notna(r['lagTime']) else None
+            max(0, r['lagTime'] - recLag)
+            if recLag is not None and pd.notna(r['lagTime'])
+            else None
         )
 
     df['recommendedLag'] = df.index.map(recommendedLagDict)
     df['avoidableLag'] = avoidableLagList
     df['lagToPaintRatio'] = df.apply(
-        lambda r: r['lagTime']/r['paintTime'] if pd.notna(r['lagTime']) and pd.notna(r['paintTime']) else None,
+        lambda r: r['lagTime'] / r['paintTime']
+        if pd.notna(r['lagTime']) and pd.notna(r['paintTime'])
+        else None,
         axis=1
     )
 
     return df, hullPointsByTS
 
-# ---------- Utility to convert hours to hhmm ----------
+# ---------- Utility ----------
 def hoursToMilitary(h):
     if pd.isna(h):
         return ''
@@ -129,7 +150,6 @@ def hoursToMilitary(h):
     m_int = int(round((h - h_int) * 60))
     return f"{h_int:02d}{m_int:02d}"
 
-# ---------- Routes ----------
 # ---------- Routes ----------
 @app.route('/')
 def index():
@@ -142,8 +162,9 @@ def addLine():
 
     if line.strip() == 'xxx' and not df.empty:
         last = df.iloc[-1]
-        df = df[~((df['paintRecord']==last['paintRecord']) & (df['ts']==last['ts']))]
+        df = df[~((df['paintRecord'] == last['paintRecord']) & (df['ts'] == last['ts']))]
         df.to_csv(DATA_FILE, index=False)
+
     elif line.strip() != 'xxx':
         records = parseLine(line)
         if records:
@@ -152,26 +173,41 @@ def addLine():
 
     dfCalc, hulls = computeBufferedHull(df)
 
-    for col in ['timeInBooth','timeStart','timeEnd']:
+    for col in ['timeInBooth', 'timeStart', 'timeEnd']:
         dfCalc[col] = dfCalc[col].apply(hoursToMilitary)
 
-    safeHulls = {str(ts): {p: v for p,v in procs.items()} for ts,procs in hulls.items()}
-    table = dfCalc.drop(columns=['date_dt'], errors='ignore').fillna('').to_dict(orient='records')
+    safeHulls = {
+        str(ts): {p: v for p, v in procs.items()}
+        for ts, procs in hulls.items()
+    }
+
+    table = (
+        dfCalc
+        .drop(columns=['date_dt'], errors='ignore')
+        .fillna('')
+        .to_dict(orient='records')
+    )
 
     return jsonify({'status': 'ok', 'table': table, 'hulls': safeHulls})
 
 @app.route('/exportExcel')
 def exportExcel():
     df = pd.read_csv(DATA_FILE)
-    dfCalc,_ = computeBufferedHull(df)
-    for col in ['timeInBooth','timeStart','timeEnd']:
+    dfCalc, _ = computeBufferedHull(df)
+
+    for col in ['timeInBooth', 'timeStart', 'timeEnd']:
         dfCalc[col] = dfCalc[col].apply(hoursToMilitary)
 
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         dfCalc.to_excel(writer, index=False)
+
     output.seek(0)
-    return send_file(output, download_name='paint_records.xlsx', as_attachment=True)
+    return send_file(
+        output,
+        download_name='paint_records.xlsx',
+        as_attachment=True
+    )
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
