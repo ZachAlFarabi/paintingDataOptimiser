@@ -22,6 +22,8 @@ if not os.path.exists(DATA_FILE):
 
 # --- Utilities ---
 def militaryTimeToHours(s):
+    if s.lower() == 'x':  # unknown
+        return None
     h = int(s[:2])
     m = int(s[2:])
     return h + m/60
@@ -31,41 +33,34 @@ def parseLine(line):
     paintRecord, ts = parts[0].split()
     processes = ['primer','topcoat','extra']
     records = []
+
     for i, part in enumerate(parts[1:]):
-        if part.strip() == '~':
-            records.append({
-                'paintRecord': int(paintRecord),
-                'ts': ts,  # keep as string
-                'process': processes[i],
-                'date': None,
-                'operator': None,
-                'timeInBooth': None,
-                'timeStart': None,
-                'timeEnd': None,
-                'paintTime': None,
-                'lagTime': None
-            })
-        else:
-            tokens = part.strip().split()
-            date = tokens[0]
-            operator = tokens[1]
-            timeInBooth = militaryTimeToHours(tokens[2])
-            timeStart = militaryTimeToHours(tokens[3])
-            timeEnd = militaryTimeToHours(tokens[4])
-            paintTime = timeEnd - timeStart
-            lagTime = timeStart - timeInBooth
-            records.append({
-                'paintRecord': int(paintRecord),
-                'ts': ts,
-                'process': processes[i],
-                'date': date,
-                'operator': operator,
-                'timeInBooth': timeInBooth,
-                'timeStart': timeStart,
-                'timeEnd': timeEnd,
-                'paintTime': paintTime,
-                'lagTime': lagTime
-            })
+        part = part.strip()
+        if part == '~':
+            continue  # skip logging blank process
+        tokens = part.split()
+        # If token is missing or 'x', convert to None
+        date = tokens[0] if tokens[0].lower() != 'x' else None
+        operator = tokens[1] if tokens[1].lower() != 'x' else None
+        timeInBooth = militaryTimeToHours(tokens[2]) if len(tokens) > 2 else None
+        timeStart = militaryTimeToHours(tokens[3]) if len(tokens) > 3 else None
+        timeEnd = militaryTimeToHours(tokens[4]) if len(tokens) > 4 else None
+
+        paintTime = float(timeEnd - timeStart) if timeStart is not None and timeEnd is not None else None
+        lagTime = float(timeStart - timeInBooth) if timeStart is not None and timeInBooth is not None else None
+
+        records.append({
+            'paintRecord': int(paintRecord),
+            'ts': ts,
+            'process': processes[i],
+            'date': date,
+            'operator': operator,
+            'timeInBooth': timeInBooth,
+            'timeStart': timeStart,
+            'timeEnd': timeEnd,
+            'paintTime': paintTime,
+            'lagTime': lagTime
+        })
     return records
 
 # --- Hull computation ---
@@ -162,14 +157,15 @@ def addLine():
         })
 
     records = parseLine(line)
-    df = pd.concat([df, pd.DataFrame(records)], ignore_index=True)
-    df.to_csv(DATA_FILE, index=False)
+    if records:
+        df = pd.concat([df, pd.DataFrame(records)], ignore_index=True)
+        df.to_csv(DATA_FILE, index=False)
     dfCalc, hulls = computeBufferedHull(df)
 
     # --- SAFE hulls serialization (force ts as string) ---
     safeHulls = {}
     for ts, processes in hulls.items():
-        ts_str = str(ts)  # <-- force string keys
+        ts_str = str(ts)
         safeHulls[ts_str] = {}
         for proc, points in processes.items():
             safePoints = []
