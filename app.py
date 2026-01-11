@@ -130,6 +130,11 @@ def hoursToMilitary(h):
     return f"{h_int:02d}{m_int:02d}"
 
 # ---------- Routes ----------
+# ---------- Routes ----------
+@app.route('/')
+def index():
+    return render_template('dashboard.html')
+
 @app.route('/addLine', methods=['POST'])
 def addLine():
     line = request.json.get('line')
@@ -147,7 +152,6 @@ def addLine():
 
     dfCalc, hulls = computeBufferedHull(df)
 
-    # Convert time columns to military time for display
     for col in ['timeInBooth','timeStart','timeEnd']:
         dfCalc[col] = dfCalc[col].apply(hoursToMilitary)
 
