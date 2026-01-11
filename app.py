@@ -131,24 +131,22 @@ def addLine():
     line = request.json.get('line')
     df = pd.read_csv(DATA_FILE)
 
-    if line.strip() == 'xxx':
-        if not df.empty:
-            last = df.iloc[-1]
-            df = df[~((df['paintRecord']==last['paintRecord']) & (df['ts']==last['ts']))]
-            df.to_csv(DATA_FILE, index=False)
-
-    else:
+    if line.strip() == 'xxx' and not df.empty:
+        last = df.iloc[-1]
+        # Remove only the last record
+        df = df[~((df['paintRecord']==last['paintRecord']) & (df['ts']==last['ts']))]
+        df.to_csv(DATA_FILE, index=False)
+    elif line.strip() != 'xxx':
         records = parseLine(line)
         if records:
             df = pd.concat([df, pd.DataFrame(records)], ignore_index=True)
             df.to_csv(DATA_FILE, index=False)
 
     dfCalc, hulls = computeBufferedHull(df)
-
     safeHulls = {str(ts): {p: v for p,v in procs.items()} for ts,procs in hulls.items()}
     table = dfCalc.drop(columns=['date_dt'], errors='ignore').fillna('').to_dict(orient='records')
 
-    return jsonify({'status':'ok','table':table,'hulls':safeHulls})
+    return jsonify({'status': 'ok', 'table': table, 'hulls': safeHulls})
 
 @app.route('/exportExcel')
 def exportExcel():
