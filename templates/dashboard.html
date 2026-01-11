@@ -2,19 +2,25 @@
 <html>
 <head>
     <title>Paint Optimiser Dashboard</title>
-    <link rel="stylesheet" href="/static/style.css">
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
+
 <h2>Paint Records Entry</h2>
-<textarea id="inputLine" placeholder="Type record and press Enter"></textarea>
+<textarea id="inputLine" rows="2" cols="80"
+ placeholder="Example: 12 PI22; 01/01/25 Bob 0730 0800 0900; ~; 01/01/25 Sue x 1000 1130"></textarea>
+<br>
 <button id="exportBtn">Export Excel</button>
-<h3>Records Table</h3>
+
+<h3>Records</h3>
 <div id="recordsTable"></div>
-<h3>Optimisation Figures</h3>
+
+<h3>Figures</h3>
 <div id="convexHullFig"></div>
 <div id="lagRatioFig"></div>
 <div id="timeDistributionFig"></div>
+
 <script src="/static/script.js"></script>
 </body>
 </html>
