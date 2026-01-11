@@ -1,0 +1,4 @@
+paintRecord,ts,process,date,operator,timeInBooth,timeStart,timeEnd,paintTime,lagTime
+9006,26,primer,06/11/25,Mike,6.25,7.75,11.75,4.0,1.5
+9006,26,topcoat,,,,,,,
+9006,26,extra,,,,,,,
