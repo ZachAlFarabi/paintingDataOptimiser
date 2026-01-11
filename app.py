@@ -121,11 +121,15 @@ def computeBufferedHull(df):
 
     return df, hullPointsByTS
 
-# ---------- Routes ----------
-@app.route('/')
-def index():
-    return render_template('dashboard.html')
+# ---------- Utility to convert hours to hhmm ----------
+def hoursToMilitary(h):
+    if pd.isna(h):
+        return ''
+    h_int = int(h)
+    m_int = int(round((h - h_int) * 60))
+    return f"{h_int:02d}{m_int:02d}"
 
+# ---------- Routes ----------
 @app.route('/addLine', methods=['POST'])
 def addLine():
     line = request.json.get('line')
@@ -133,7 +137,6 @@ def addLine():
 
     if line.strip() == 'xxx' and not df.empty:
         last = df.iloc[-1]
-        # Remove only the last record
         df = df[~((df['paintRecord']==last['paintRecord']) & (df['ts']==last['ts']))]
         df.to_csv(DATA_FILE, index=False)
     elif line.strip() != 'xxx':
@@ -143,6 +146,11 @@ def addLine():
             df.to_csv(DATA_FILE, index=False)
 
     dfCalc, hulls = computeBufferedHull(df)
+
+    # Convert time columns to military time for display
+    for col in ['timeInBooth','timeStart','timeEnd']:
+        dfCalc[col] = dfCalc[col].apply(hoursToMilitary)
+
     safeHulls = {str(ts): {p: v for p,v in procs.items()} for ts,procs in hulls.items()}
     table = dfCalc.drop(columns=['date_dt'], errors='ignore').fillna('').to_dict(orient='records')
 
@@ -152,6 +160,9 @@ def addLine():
 def exportExcel():
     df = pd.read_csv(DATA_FILE)
     dfCalc,_ = computeBufferedHull(df)
+    for col in ['timeInBooth','timeStart','timeEnd']:
+        dfCalc[col] = dfCalc[col].apply(hoursToMilitary)
+
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         dfCalc.to_excel(writer, index=False)
